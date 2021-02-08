@@ -377,10 +377,10 @@ parser = MyParser(description='elf downgrader tool')
 
 if Debug is False:
 	parser.add_argument('--input', required=True, type=str, help='old file')
-	parser.add_argument('--output', required=False, default="", type=str, help='old file')
+	parser.add_argument('--output', required=False, default="", type=str, help='new file')
 	parser.add_argument('--dry-run', required=False, default=False, action='store_true', help='if inserted then nothing will be written to the output file')
 	parser.add_argument('--verbose', required=False, default=False, action='store_true', help='detailed printing')
-	parser.add_argument('--overwrite', required=False, default=False, action='store_true', help='detailed printing')
+	parser.add_argument('--overwrite', required=False, default=False, action='store_true')
 	parser.add_argument('--sdk-version', required=False, default="0", type=str, help='wanted sdk version, leave empty for no patching')# 05.050.001 is the one usually used when converting sdk version
 	parser.add_argument('--add-modded-to-output', required=False, default=False, action='store_true', help='if true then adds _modded to the output file name')
 	parser.add_argument('--patch-memhole', required=False, default="2", type=str, help="0 - don't patch, 1 - patch the memory size, 2 - move the segments")
@@ -395,10 +395,10 @@ if Debug is False:
 		sys.exit(1)
 else:
 	parser.add_argument('--input', required=False, default="C:/somefolder/somefile.elf", type=str, help='old file')
-	parser.add_argument('--output', required=False, default="", type=str, help='old file')
+	parser.add_argument('--output', required=False, default="", type=str, help='new file')
 	parser.add_argument('--dry-run', required=False, default=False, action='store_true', help='if inserted then nothing will be written to the output file')
 	parser.add_argument('--verbose', required=False, default=False, action='store_true', help='detailed printing')
-	parser.add_argument('--overwrite', required=False, default=False, action='store_true', help='detailed printing')
+	parser.add_argument('--overwrite', required=False, default=False, action='store_true')
 	parser.add_argument('--sdk-version', required=False, default="0", type=str, help='wanted sdk version, leave empty for no patching')# 05.050.001 is the one usually used when converting sdk version
 	parser.add_argument('--add-modded-to-output', required=False, default=False, action='store_true', help='if true then adds _modded to the output file name')
 	parser.add_argument('--patch-memhole', required=False, default="2", type=str, help="0 - don't patch, 1 - patch the memory size, 2 - move the segments")
