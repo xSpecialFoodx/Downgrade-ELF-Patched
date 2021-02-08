@@ -438,7 +438,10 @@ if args.output == "":
 
 		output_file_path = output_folder_path + "/" + output_file_name
 	else:
-		output_folder_path = input_folder_path + "/output"
+		output_folder_path = input_folder_path
+
+		if args.add_modded_to_output is False:
+			output_folder_path += "/output"
 
 		output_file_path = output_folder_path + "/" + output_file_name
 else:
