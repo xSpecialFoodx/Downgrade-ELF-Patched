@@ -473,7 +473,7 @@ print(
 	+ "Verbose:" + ' ' + ("True" if args.verbose is True else "False") + "\n"
 	+ "Overwrite:" + ' ' + ("True" if args.overwrite is True else "False") + "\n"
 	+ "Sdk Version:" + ' ' + ("Not patching" if args.sdk_version == "0" else args.sdk_version) + "\n"
-	+ "Add Modded to Output:" + ' ' + ("True" if args.add_modded_to_output is True else "False") + "\n"
+	+ "Add _modded to Output:" + ' ' + ("True" if args.add_modded_to_output is True else "False") + "\n"
 	+ "Patch Memory Hole:" + ' ' + args.patch_memhole + "\n"
 	+ "Patch Program Headers:" + ' ' + ("False" if args.not_patch_program_headers is True else "True") + "\n"
 	+ "Patch Dynamic Section:" + ' ' + ("False" if args.not_patch_dynamic_section is True else "True") + "\n"
