@@ -18,6 +18,7 @@ import distutils.dir_util
 
 from hexdump import hexdump
 from pprint import pprint
+import math
 
 def align_up(x, alignment):
 	return (x + (alignment - 1)) & ~(alignment - 1)
@@ -371,6 +372,88 @@ def CheckHexText(source, length, add_0x):  # returns the hex text
 
     return result
 
+def add_replacement(old_value, new_value, struct_fmt):
+	result = None
+		
+	replacement_old_value = old_value
+	replacement_old_value_bytes = struct.pack(struct_fmt, old_value)
+
+	replacement_new_value = new_value
+	replacement_new_value_bytes = struct.pack(struct_fmt, new_value)
+
+	replacement_value_size = struct.calcsize(struct_fmt)
+
+	replacement_min_segments_index = 0
+
+	replacement = (
+		[
+			replacement_old_value
+			, replacement_old_value_bytes
+			, replacement_new_value
+			, replacement_new_value_bytes
+			, replacement_value_size
+			, replacement_min_segments_index
+		]
+	)
+
+	result = replacement
+
+	return result
+
+def remove_replacements_duplicates(replacements):
+	result = None
+
+	current_result = None
+
+	replacement = None
+
+	replacement_old_value = None
+	# replacement_old_value_bytes = None
+
+	# replacement_new_value = None
+	# replacement_new_value_bytes = None
+		
+	# replacement_value_size = None
+
+	# replacement_min_segments_index = None
+
+	replacements_old_value_list = []
+
+	for replacement in replacements:
+		replacement_old_value = replacement[0]
+		# replacement_old_value_bytes = replacement[1]
+
+		# replacement_new_value = replacementA[2]
+		# replacement_new_value_bytes = replacement[3]
+		
+		# replacement_value_size = replacement[4]
+
+		# replacement_min_segments_index = replacement[5]
+
+		if replacement_old_value not in replacements_old_value_list:
+			if current_result is None:
+				current_result = []
+
+			current_result.append(replacement)
+
+			replacements_old_value_list.append(replacement_old_value)
+
+	result = current_result
+
+	return result
+
+
+def print_patch_memhole_references_help():
+	print("patch memhole references options:")
+	print(
+		"00x:" + '\t' + "0 - don't patch memory hole segments bytes"
+		+ "\n" + '\t' + "1 - patch memory hole segments bytes"
+		+ "\n" + "0x0:" + '\t' + "0 - don't patch memory hole segments bytes that the bits from their end up to the replacement value bytes amount aren't 0"
+		+ "\n" + '\t' + "1 - patch memory hole segments bytes that the bits from their end up to the replacement value bytes amount aren't 0"
+		+ "\n" + "x00:" + '\t' + "0 - don't patch memory hole segments bytes with addresses that aren't a multiply of 8"
+		+ "\n" + '\t' + "1 - patch memory hole segments bytes with addresses that aren't a multiply of 8"
+	)
+
 Debug = False
 
 parser = MyParser(description='elf downgrader tool')
@@ -384,6 +467,8 @@ if Debug is False:
 	parser.add_argument('--sdk-version', required=False, default="0", type=str, help='wanted sdk version, leave empty for no patching')# 05.050.001 is the one usually used when converting sdk version
 	parser.add_argument('--add-modded-to-output', required=False, default=False, action='store_true', help='if true then adds _modded to the output file name')
 	parser.add_argument('--patch-memhole', required=False, default="2", type=str, help="0 - don't patch, 1 - patch the memory size, 2 - move the segments")
+	parser.add_argument('--patch-memhole-references', required=False, default="001", type=str, help=("use --patch-memhole-references-help in order to see usage"))
+	parser.add_argument('--patch-memhole-references-help', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-program-headers', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-dynamic-section', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-relocation-section', required=False, default=False, action='store_true')
@@ -402,6 +487,8 @@ else:
 	parser.add_argument('--sdk-version', required=False, default="0", type=str, help='wanted sdk version, leave empty for no patching')# 05.050.001 is the one usually used when converting sdk version
 	parser.add_argument('--add-modded-to-output', required=False, default=False, action='store_true', help='if true then adds _modded to the output file name')
 	parser.add_argument('--patch-memhole', required=False, default="2", type=str, help="0 - don't patch, 1 - patch the memory size, 2 - move the segments")
+	parser.add_argument('--patch-memhole-references', required=False, default="001", type=str, help=("use --patch-memhole-references-help in order to see usage"))
+	parser.add_argument('--patch-memhole-references-help', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-program-headers', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-dynamic-section', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-relocation-section', required=False, default=False, action='store_true')
@@ -409,6 +496,10 @@ else:
 	parser.add_argument('--not-patch-elf-header', required=False, default=False, action='store_true')
 
 args = parser.parse_args()
+
+if args.patch_memhole_references_help is True:
+	print_patch_memhole_references_help()
+	sys.exit(1)
 
 input_file_path = os.path.abspath(args.input).replace('\\','/')
 
@@ -472,9 +563,11 @@ print(
 	+ "Dry Run:" + ' ' + ("True" if args.dry_run is True else "False") + "\n"
 	+ "Verbose:" + ' ' + ("True" if args.verbose is True else "False") + "\n"
 	+ "Overwrite:" + ' ' + ("True" if args.overwrite is True else "False") + "\n"
-	+ "Sdk Version:" + ' ' + ("Not patching" if args.sdk_version == "0" else args.sdk_version) + "\n"
+	+ "Sdk Version:" + ' ' + ("Not Patching" if args.sdk_version == "0" else args.sdk_version) + "\n"
 	+ "Add _modded to Output:" + ' ' + ("True" if args.add_modded_to_output is True else "False") + "\n"
 	+ "Patch Memory Hole:" + ' ' + args.patch_memhole + "\n"
+	+ "Patch Memory Hole References:" + ' ' + args.patch_memhole_references + "\n"
+	+ "Patch Memory Hole References Help:" + ' ' + ("True" if args.patch_memhole_references_help is True else "False") + "\n"
 	+ "Patch Program Headers:" + ' ' + ("False" if args.not_patch_program_headers is True else "True") + "\n"
 	+ "Patch Dynamic Section:" + ' ' + ("False" if args.not_patch_dynamic_section is True else "True") + "\n"
 	+ "Patch Relocation Section:" + ' ' + ("False" if args.not_patch_relocation_section is True else "True") + "\n"
@@ -499,8 +592,14 @@ with open(output_file_path_fixed, 'r+b') as f:
 	TagsLength = 8
 	TypesLength = 8
 	ValuesLength = 8#16
+	
+	struct_fmt = None
+	struct_size = None
 
 	method_found = False
+	error_found = False
+
+	has_changes = False
 
 	selfutil_detected = False
 
@@ -552,6 +651,8 @@ with open(output_file_path_fixed, 'r+b') as f:
 		if phdr is not None:
 			print('found param segment, parsing param structure')
 
+			struct_fmt = '<I'
+
 			f.seek(phdr.offset)
 
 			data = f.read(phdr.file_size)
@@ -560,7 +661,7 @@ with open(output_file_path_fixed, 'r+b') as f:
 				print('error: insufficient data read')
 				sys.exit(1)
 
-			param_size, = struct.unpack('<I', data[0x0:0x4])
+			param_size, = struct.unpack(struct_fmt, data[0x0:0x4])
 
 			if param_size < 0x14:
 				print('error: param structure is too small')
@@ -572,7 +673,7 @@ with open(output_file_path_fixed, 'r+b') as f:
 				print('error: unexpected param structure format')
 				sys.exit(1)
 
-			old_sdk_version, = struct.unpack('<I', data[0x10:0x14])
+			old_sdk_version, = struct.unpack(struct_fmt, data[0x10:0x14])
 			major, minor, patch = parse_sdk_version(old_sdk_version)
 			old_sdk_version_str = stringify_sdk_version(major, minor, patch)
 
@@ -584,7 +685,7 @@ with open(output_file_path_fixed, 'r+b') as f:
 
 				if args.dry_run is False:
 					f.seek(phdr.offset + 0x10)
-					f.write(struct.pack('<I', new_sdk_version))
+					f.write(struct.pack(struct_fmt, new_sdk_version))
 
 				print('patched param structure')
 				
@@ -612,7 +713,7 @@ with open(output_file_path_fixed, 'r+b') as f:
 
 		DynamicTableEntriesAmount = None
 		DynamicTableEntriesIndex = None
-		DynamicTableEntries_addr = None
+		DynamicTable_addr = None
 		
 		RelaTableSize = 0
 		RelaTableEntriesAmount = None
@@ -657,13 +758,12 @@ with open(output_file_path_fixed, 'r+b') as f:
 
 		mem_size_aligned = None
 
-		struct_size = None
-
 		faddr = None
 
 		old_struct_data = None
 		old_struct_unpacked = None
 		
+		new_struct_data_list = None
 		new_struct_data = None
 		new_struct_unpacked = None
 
@@ -672,6 +772,9 @@ with open(output_file_path_fixed, 'r+b') as f:
 
 		new_d_val = None
 
+		d_val_replacements = None
+		d_val_replacements_use = True  # suggested not to use, doesn't appear to be necessary
+
 		old_r_addr = None
 		r_info = None
 		r_sym = None
@@ -679,6 +782,11 @@ with open(output_file_path_fixed, 'r+b') as f:
 
 		new_r_addr = None
 		new_r_addend = None
+
+		r_addr_replacements = None
+		r_addr_replacements_use = True  # suggested not to use, not tested enough, but appears to just cause problems and be not needed
+		r_addend_replacements = None
+		r_addend_replacements_use = True
 
 		r_type = None
 
@@ -690,11 +798,52 @@ with open(output_file_path_fixed, 'r+b') as f:
 		st_size = None
 
 		new_st_value = None
+
+		st_value_replacements = None
+		st_value_replacements_use = True
 		
 		st_type = None
 		st_bind = None
 
-		has_changes = False
+		patch_memhole_references_value = int(args.patch_memhole_references, 2)
+		patch_memhole_references_enable = ((patch_memhole_references_value & int("001", 2)) > 0)
+		patch_memhole_references_patch_rest_bytes_not_zeroes = ((patch_memhole_references_value & int("010", 2)) > 0)
+		patch_memhole_references_patch_not_8_multiply = ((patch_memhole_references_value & int("100", 2)) > 0)
+
+		safe_min_bytes_size = None
+		safe_min_bytes_amount = None
+		safe_min_bytes_estimated_amount = None
+
+		safe_max_bytes_size = None
+		safe_max_bytes_amount = None
+		safe_max_bytes_estimated_amount = None
+		
+		replacements = None
+		replacements_amount = None
+		replacements_min_value = None
+		replacements_max_value = None
+		replacement = None
+
+		replacement_old_value = None
+		replacement_old_value_bytes = None
+
+		replacement_new_value = None
+		replacement_new_value_bytes = None
+		
+		replacement_value_size = None
+
+		old_replacement_min_segments_index = None
+
+		new_replacement_min_segments_index = None
+
+		SegmentsIndex = 0
+						
+		current_value = None
+		current_value_size_index = None
+
+		bytes_estimated_index = None
+
+		bytes_index = None
 
 		for phdrs_index, phdr in enumerate(elf.phdrs):
 			if phdr.type not in [ElfProgramHeader.PT_LOAD, ElfProgramHeader.PT_SCE_RELRO]:
@@ -774,10 +923,13 @@ with open(output_file_path_fixed, 'r+b') as f:
 			if dynamicPH is None:
 				print("An error occurred, as the ELF is not a valid OELF!")
 				sys.exit(1)
+	
+			struct_fmt = '<QQ'
+			struct_size = struct.calcsize(struct_fmt)
 			
-			DynamicTableEntriesAmount = int(dynamicPH.mem_size / struct.calcsize('<QQ'))
+			DynamicTableEntriesAmount = int(dynamicPH.mem_size / struct_size)
 		
-			DynamicTableEntries_addr = dynamicPH.offset
+			DynamicTable_addr = dynamicPH.offset
 			RelaTable_addr = dynlibDataPH.offset
 			SymTable_addr  = dynlibDataPH.offset
 
@@ -788,8 +940,11 @@ with open(output_file_path_fixed, 'r+b') as f:
 			or args.not_patch_symbol_table is False
 		) and args.patch_memhole == "2":
 			for DynamicTableEntriesIndex in range(0, DynamicTableEntriesAmount):
-				f.seek(dynamicPH.offset + (DynamicTableEntriesIndex * struct.calcsize('<QQ')))
-				d_tag, d_val = struct.unpack('<QQ', f.read(struct.calcsize('<QQ')))
+				struct_fmt = '<QQ'
+				struct_size = struct.calcsize(struct_fmt)
+
+				f.seek(dynamicPH.offset + (DynamicTableEntriesIndex * struct_size))
+				d_tag, d_val = struct.unpack(struct_fmt, f.read(struct_size))
 			
 				if d_tag == DT_SCE_JMPREL:
 					RelaTable_addr += d_val
@@ -802,8 +957,15 @@ with open(output_file_path_fixed, 'r+b') as f:
 				elif d_tag == DT_SCE_SYMTABSZ:
 					SymTableSize += d_val
 		
-			RelaTableEntriesAmount = int(RelaTableSize / struct.calcsize('<QLLq'))
-			SymTableEntriesAmount = int(SymTableSize / struct.calcsize('<IBBHQQ'))
+			struct_fmt = '<QLLq'
+			struct_size = struct.calcsize(struct_fmt)
+
+			RelaTableEntriesAmount = int(RelaTableSize / struct_size)
+		
+			struct_fmt = '<IBBHQQ'
+			struct_size = struct.calcsize(struct_fmt)
+
+			SymTableEntriesAmount = int(SymTableSize / struct_size)
 
 		#print('')
 
@@ -919,7 +1081,7 @@ with open(output_file_path_fixed, 'r+b') as f:
 						paddr_diff = old_paddr - new_paddr
 						vaddr_diff = old_vaddr - new_vaddr
 								
-						if args.verbose:
+						if args.verbose is True:
 							Headers = []
 								
 							Headers.append("Old Memory Size")
@@ -958,13 +1120,15 @@ with open(output_file_path_fixed, 'r+b') as f:
 							print("Found dynamic section, entries:" + ' ' + str(DynamicTableEntriesAmount))
 
 							for DynamicTableEntriesIndex in range(0, DynamicTableEntriesAmount):
-								struct_size = struct.calcsize('<QQ')
-								faddr = DynamicTableEntries_addr + (DynamicTableEntriesIndex * struct_size)
+								struct_fmt = '<QQ'
+								struct_size = struct.calcsize(struct_fmt)
+
+								faddr = DynamicTable_addr + (DynamicTableEntriesIndex * struct_size)
 
 								f.seek(faddr)
 
 								old_struct_data = f.read(struct_size)
-								old_struct_unpacked = struct.unpack('<QQ', old_struct_data)
+								old_struct_unpacked = struct.unpack(struct_fmt, old_struct_data)
 
 								d_tag, old_d_val = old_struct_unpacked
 
@@ -979,14 +1143,19 @@ with open(output_file_path_fixed, 'r+b') as f:
 									if new_d_val >= vaddr_start and new_d_val <= vaddr_end:
 										new_d_val -= vaddr_diff
 
+										if d_val_replacements is None:
+											d_val_replacements = []
+
+										d_val_replacements.append(add_replacement(old_d_val, new_d_val, '<Q'))
+
 										new_struct_unpacked = d_tag, new_d_val
-										new_struct_data = struct.pack('<QQ', d_tag, new_d_val)
+										new_struct_data = struct.pack(struct_fmt, d_tag, new_d_val)
 
 										if args.dry_run is False:
 											f.seek(faddr)
 											f.write(new_struct_data)
 
-										if args.verbose:
+										if args.verbose is True:
 											Headers = []
 								
 											Headers.append("Entry")
@@ -1018,14 +1187,15 @@ with open(output_file_path_fixed, 'r+b') as f:
 							print("Found relocation section, entries:" + ' ' + str(RelaTableEntriesAmount))
 
 							for RelaTableEntriesIndex in range(0, RelaTableEntriesAmount):
-								struct_size = struct.calcsize('<QLLq')
+								struct_fmt = '<QLLq'
+								struct_size = struct.calcsize(struct_fmt)
 
 								faddr = RelaTable_addr + (RelaTableEntriesIndex * struct_size)
 
 								f.seek(faddr)
 
 								old_struct_data = f.read(struct_size)
-								old_struct_unpacked = struct.unpack('<QLLq', old_struct_data)
+								old_struct_unpacked = struct.unpack(struct_fmt, old_struct_data)
 
 								old_r_addr, r_info, r_sym, old_r_addend = old_struct_unpacked
 
@@ -1043,8 +1213,13 @@ with open(output_file_path_fixed, 'r+b') as f:
 
 								if new_r_addr >= vaddr_start and new_r_addr <= vaddr_end:
 									new_r_addr -= vaddr_diff
+
+									if r_addr_replacements is None:
+										r_addr_replacements = []
+
+									r_addr_replacements.append(add_replacement(old_r_addr, new_r_addr, '<Q'))
 								
-									if args.verbose:
+									if args.verbose is True:
 										Headers = []
 								
 										Headers.append("Entry")
@@ -1069,8 +1244,13 @@ with open(output_file_path_fixed, 'r+b') as f:
 				
 								if new_r_addend >= vaddr_start and new_r_addend <= vaddr_end:
 									new_r_addend -= vaddr_diff
+
+									if r_addend_replacements is None:
+										r_addend_replacements = []
+
+									r_addend_replacements.append(add_replacement(old_r_addend, new_r_addend, '<q'))
 								
-									if args.verbose:
+									if args.verbose is True:
 										Headers = []
 								
 										Headers.append("Entry")
@@ -1095,7 +1275,7 @@ with open(output_file_path_fixed, 'r+b') as f:
 				
 								if new_r_addr != old_r_addr or new_r_addend != old_r_addend:
 									new_struct_unpacked = new_r_addr, r_info, r_sym, new_r_addend
-									new_struct_data = struct.pack('<QLLq', new_r_addr, r_info, r_sym, new_r_addend)
+									new_struct_data = struct.pack(struct_fmt, new_r_addr, r_info, r_sym, new_r_addend)
 						
 									if args.dry_run is False:
 										f.seek(faddr)
@@ -1116,14 +1296,15 @@ with open(output_file_path_fixed, 'r+b') as f:
 							print("Found symbol table, entries:" + ' ' + str(SymTableEntriesAmount))
 					
 							for SymTableEntriesIndex in range(0, SymTableEntriesAmount):
-								struct_size = struct.calcsize('<IBBHQQ')
+								struct_fmt = '<IBBHQQ'
+								struct_size = struct.calcsize(struct_fmt)
 
 								faddr = SymTable_addr + (SymTableEntriesIndex * struct_size)
 
 								f.seek(faddr)
 
-								old_struct_data = f.read(struct.calcsize('<IBBHQQ'))
-								old_struct_unpacked = struct.unpack('<IBBHQQ', old_struct_data)
+								old_struct_data = f.read(struct_size)
+								old_struct_unpacked = struct.unpack(struct_fmt, old_struct_data)
 
 								st_name, st_info, st_other, st_shndx, old_st_value, st_size = old_struct_unpacked
 
@@ -1143,14 +1324,19 @@ with open(output_file_path_fixed, 'r+b') as f:
 								if new_st_value >= vaddr_start and new_st_value <= vaddr_end:
 									new_st_value -= vaddr_diff
 
+									if st_value_replacements is None:
+										st_value_replacements = []
+
+									st_value_replacements.append(add_replacement(old_st_value, new_st_value, '<Q'))
+
 									new_struct_unpacked = st_name, st_info, st_other, st_shndx, new_st_value, st_size
-									new_struct_data = struct.pack('<IBBHQQ', st_name, st_info, st_other, st_shndx, new_st_value, st_size)
+									new_struct_data = struct.pack(struct_fmt, st_name, st_info, st_other, st_shndx, new_st_value, st_size)
 									
 									if args.dry_run is False:
 										f.seek(faddr)
 										f.write(new_struct_data)
 
-									if args.verbose:
+									if args.verbose is True:
 										Headers = []
 
 										Headers.append("Entry")
@@ -1182,12 +1368,265 @@ with open(output_file_path_fixed, 'r+b') as f:
 							print("")	
 							print("patched symbol table")
 
+					if patch_memhole_references_enable is True and args.patch_memhole == "2":
+						# memory hole references patching
+					
+						print("")
+						print("patching memory hole references between the segment before the memory hole to the segment after the memory hole and its file size")
+
+						# might be that it's segment before memhole to after its file size and segment after memhole to after its file size
+						# but we don't do 2 ranges, so instead we do segment before memhole to the segment after the memhole and its file size
+								
+						struct_size = SegmentAfterMemHole_Mapped_VirtualAddress + SegmentAfterMemHole_FileSize - SegmentBeforeMemHole_VirtualAddress
+
+						replacements = (
+							(st_value_replacements if st_value_replacements is not None and st_value_replacements_use is True else [])
+							+ (r_addend_replacements if r_addend_replacements is not None and r_addend_replacements_use is True else [])
+							+ (d_val_replacements if d_val_replacements is not None and d_val_replacements_use is True else [])
+							+ (r_addr_replacements if r_addr_replacements is not None and r_addr_replacements_use is True else [])
+						)
+
+						replacements = remove_replacements_duplicates(replacements)
+
+						if replacements is not None:
+							replacements_amount = len(replacements)
+						else:
+							replacements_amount = 0
+
+						print("Found memory hole references section, entries:" + ' ' + str(struct_size))
+
+						if replacements_amount > 0:
+							faddr = segment.offset
+
+							f.seek(faddr)
+
+							old_struct_data = f.read(struct_size)
+						
+							new_struct_data_list = []
+							new_struct_data = None
+
+							safe_min_bytes_size = int(SegmentAfterMemHole_Unmapped_VirtualAddress)
+							safe_min_bytes_amount = int(math.ceil(math.log(safe_min_bytes_size, 0x00000100)))
+							safe_min_bytes_estimated_amount = int(math.pow(2, int(math.ceil(math.log(safe_min_bytes_amount, 2)))))
+
+							safe_max_bytes_size = int(SegmentAfterMemHole_Unmapped_VirtualAddress + SegmentAfterMemHole_MemorySize - 1)
+							safe_max_bytes_amount = int(math.ceil(math.log(safe_max_bytes_size, 0x00000100)))
+							safe_max_bytes_estimated_amount = int(math.pow(2, int(math.ceil(math.log(safe_max_bytes_amount, 2)))))
+						
+							replacements_min_value = SegmentAfterMemHole_Unmapped_VirtualAddress
+							replacements_max_value = SegmentAfterMemHole_Unmapped_VirtualAddress + SegmentAfterMemHole_MemorySize - 1
+
+							while SegmentsIndex <= struct_size - 1:
+								current_value = 0
+								current_value_size_index = 0
+								
+								bytes_estimated_index = safe_min_bytes_estimated_amount
+								
+								while bytes_estimated_index <= safe_max_bytes_estimated_amount:
+									if SegmentsIndex <= struct_size - bytes_estimated_index:
+										current_value_size = bytes_estimated_index
+
+										while current_value_size_index < current_value_size:
+											current_value += (
+												int(math.pow(0x00000100, current_value_size_index)
+												* ord(old_struct_data[SegmentsIndex + current_value_size_index]))
+											)
+
+											current_value_size_index += 1
+
+										if current_value >= replacements_min_value and current_value <= replacements_max_value:
+											for replacement in replacements:
+												replacement_old_value = replacement[0]
+												replacement_old_value_bytes = replacement[1]
+
+												replacement_new_value = replacement[2]
+												replacement_new_value_bytes = replacement[3]
+		
+												replacement_value_size = replacement[4]
+
+												old_replacement_min_segments_index = replacement[5]
+
+												new_replacement_min_segments_index = old_replacement_min_segments_index
+
+												if SegmentsIndex >= old_replacement_min_segments_index:
+													if current_value_size <= replacement_value_size:
+														for bytes_index in range(0, current_value_size):
+															if old_struct_data[SegmentsIndex + bytes_index] != replacement_old_value_bytes[bytes_index]:
+																error_found = True
+
+																break
+
+														if error_found is True:
+															error_found = False
+														else:
+															for bytes_index in range(current_value_size, replacement_value_size):
+																if ord(replacement_old_value_bytes[bytes_index]) != 0:
+																	error_found = True
+
+																	break
+
+															if error_found is True:
+																error_found = False
+															else:
+																new_replacement_min_segments_index = SegmentsIndex + current_value_size
+
+												if new_replacement_min_segments_index != old_replacement_min_segments_index:
+													if SegmentsIndex <= struct_size - replacement_value_size:
+														for bytes_index in range(current_value_size, replacement_value_size):
+															if ord(old_struct_data[SegmentsIndex + bytes_index]) != 0:
+																error_found = True
+
+																break
+													else:
+														error_found = True
+
+													if error_found is True:
+														error_found = False
+
+														if patch_memhole_references_patch_rest_bytes_not_zeroes is True:
+															method_found = True
+
+															print(
+																"Patching memory hole segments bytes that the bits from their end"
+																+ ' ' + "up to the replacement value bytes amount aren't 0"
+															)
+														else:
+															print(
+																"Skipped patch for memory hole segments bytes that the bits from their end"
+																+ ' ' + "up to the replacement value bytes amount aren't 0"
+															)
+													else:
+														method_found = True
+
+													if method_found is True:
+														method_found = False
+
+														if (SegmentsIndex + SegmentBeforeMemHole_VirtualAddress) % 8 != 0:
+															error_found = True
+
+														if error_found is True:
+															if patch_memhole_references_patch_not_8_multiply is True:
+																method_found = True
+
+																print("Patching memory hole segments bytes with an address that isn't a multiply of 8")
+															else:
+																print("Skipped patch for memory hole segments bytes with an address that isn't a multiply of 8")
+														else:
+															method_found = True
+														
+													if method_found is True:
+														replacement[5] = new_replacement_min_segments_index
+
+														# not going for all of the replacement value size, because we don't want to change the structure
+														# of the original data (in case it's not zeroes, we might accept it if using the
+														# patch memhole references patch rest bytes not zeroes flag, so whether it's zeroes or not it doesn't matter by here
+														# and we ain't gonna change stuff we don't need to)
+
+														for bytes_index in range(0, current_value_size):
+															new_struct_data_list.append(replacement_new_value_bytes[bytes_index])
+													
+														if args.verbose is True:
+															Headers = []
+
+															Headers.append("Entry")
+															Headers.append("Address")
+															Headers.append("Old Value")
+															Headers.append("New Value")
+															Headers.append("Section")
+
+															if d_val_replacements is not None and replacement in d_val_replacements:
+																Section = "dynamic values"
+															elif r_addr_replacements is not None and replacement in r_addr_replacements:
+																Section = "relocation addresses"
+															elif r_addend_replacements is not None and replacement in r_addend_replacements:
+																Section = "relocation addends"
+															else:
+																Section = "symbol values"
+
+															Fields = []
+
+															Fields.append(Headers[0] + ':' + ' ' + str(SegmentsIndex + 1))
+															Fields.append(
+																Headers[1] + ':'
+																+ ' ' + CheckHexText(SegmentsIndex + SegmentBeforeMemHole_VirtualAddress, AddressesLength, True)
+															)
+
+															Fields.append(Headers[2] + ':' + ' ' + CheckHexText(replacement_old_value, AddressesLength, True))
+															Fields.append(Headers[3] + ':' + ' ' + CheckHexText(replacement_new_value, AddressesLength, True))
+															Fields.append(Headers[4] + ':' + ' ' + Section)
+
+															print('\t'.join(Fields))
+													else:
+														Headers = []
+
+														Headers.append("Entry")
+														Headers.append("Address")
+														Headers.append("Value")
+														Headers.append("Section")
+
+														if d_val_replacements is not None and replacement in d_val_replacements:
+															Section = "dynamic values"
+														elif r_addr_replacements is not None and replacement in r_addr_replacements:
+															Section = "relocation addresses"
+														elif r_addend_replacements is not None and replacement in r_addend_replacements:
+															Section = "relocation addends"
+														else:
+															Section = "symbol values"
+
+														Fields = []
+
+														Fields.append(Headers[0] + ':' + ' ' + str(SegmentsIndex + 1))
+														Fields.append(
+															Headers[1] + ':'
+															+ ' ' + CheckHexText(SegmentsIndex + SegmentBeforeMemHole_VirtualAddress, AddressesLength, True)
+														)
+
+														Fields.append(Headers[2] + ':' + ' ' + CheckHexText(replacement_old_value, AddressesLength, True))
+
+														if len(Section) > 0:
+															Fields.append(Headers[3] + ':' + ' ' + Section)
+
+														print('(' + '\t'.join(Fields) + ')')
+
+												if method_found is True:
+													# going forward in current value size and not in replacement value size
+													# because it might be smaller and contain data afterwards
+
+													SegmentsIndex += current_value_size
+
+													break
+
+											if method_found is True:
+												break
+									else:
+										break
+
+									bytes_estimated_index += 1
+
+								if method_found is True:
+									method_found = False
+								else:
+									new_struct_data_list.append(old_struct_data[SegmentsIndex])
+
+									SegmentsIndex += 1
+
+							new_struct_data = "".join(new_struct_data_list)
+						
+							if args.dry_run is False:
+								f.seek(faddr)
+								f.write(new_struct_data)
+
+						print("")
+						print("patched memory hole references")
+
 					print("")
 					print("First Segment Virtual Address:" + ' ' + CheckHexText(FirstSegment_VirtualAddress, AddressesLength, True))
+					print("")
 					print("Segment Before Memory Hole Virtual Address:" + ' ' + CheckHexText(SegmentBeforeMemHole_VirtualAddress, AddressesLength, True))
+					print("")
 					print("Segment After Memory Hole Unmapped Virtual Address:" + ' ' + CheckHexText(SegmentAfterMemHole_Unmapped_VirtualAddress, AddressesLength, True))
 					print("Segment After Memory Hole Mapped Virtual Address:" + ' ' + CheckHexText(SegmentAfterMemHole_Mapped_VirtualAddress, AddressesLength, True))
-					print("Segment After Memory Hole File Size:" + ' ' + CheckHexText(SegmentAfterMemHole_FileSize, MemorySizeLength, True))
+					# print("Segment After Memory Hole File Size:" + ' ' + CheckHexText(SegmentAfterMemHole_FileSize, MemorySizeLength, True))
 					print("Segment After Memory Hole Memory Size:" + ' ' + CheckHexText(SegmentAfterMemHole_MemorySize, MemorySizeLength, True))
 
 	#
@@ -1237,22 +1676,27 @@ with open(output_file_path_fixed, 'r+b') as f:
 						name = data[offset:offset + length]
 						name, old_sdk_version = name.split(':', 1)
 
-						if len(old_sdk_version) != struct.calcsize('I'):
+						struct_fmt = 'I'
+						struct_size = struct.calcsize(struct_fmt)
+
+						if len(old_sdk_version) != struct_size:
 							print('error: unexpected library list entry format')
 
 							sys.exit(1)
+							
+						struct_fmt = '>I'
 
-						old_sdk_version, = struct.unpack('>I', old_sdk_version)
+						old_sdk_version, = struct.unpack(struct_fmt, old_sdk_version)
 						major, minor, patch = parse_sdk_version(old_sdk_version)
 						old_sdk_version_str = stringify_sdk_version(major, minor, patch)
 
-						if args.verbose:
+						if args.verbose is True:
 							print('{0} (sdk version: {1})'.format(name, old_sdk_version_str))
 
 						if old_sdk_version > new_sdk_version:
 							has_changes = True
 
-							data = data[:offset] + name + ':' + struct.pack('>I', new_sdk_version) + data[offset + length:]
+							data = data[:offset] + name + ':' + struct.pack(struct_fmt, new_sdk_version) + data[offset + length:]
 
 						offset += length
 
