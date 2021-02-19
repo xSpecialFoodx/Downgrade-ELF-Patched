@@ -517,12 +517,12 @@ if args.output == "":
 	input_file_name_extension_length = len(input_file_name_extension)
 	input_file_name_without_extension = input_file_name[:input_file_name_length - input_file_name_extension_length - 1]
 
-	output_file_name_extension = input_file_name_without_extension
+	output_file_name_without_extension = input_file_name_without_extension
 
 	if args.add_modded_to_output is True:
-		output_file_name_extension += "_modded"
+		output_file_name_without_extension += "_modded"
 
-	output_file_name = output_file_name_extension + '.' + input_file_name_extension
+	output_file_name = output_file_name_without_extension + '.' + input_file_name_extension
 
 	if args.overwrite is True:
 		output_folder_path = input_folder_path + "/backup"
