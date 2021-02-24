@@ -508,6 +508,9 @@ if not os.path.isfile(input_file_path):
 
 input_folder_path = os.path.dirname(input_file_path).replace('\\','/')
 
+if input_folder_path[len(input_folder_path) - 1] == '/':
+	input_folder_path = input_folder_path[:-1]
+
 if args.output == "":
 	input_file_name = os.path.basename(input_file_path)
 	input_file_name_length = len(input_file_name)
