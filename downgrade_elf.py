@@ -466,7 +466,7 @@ if Debug is False:
 	parser.add_argument('--overwrite', required=False, default=False, action='store_true')
 	parser.add_argument('--sdk-version', required=False, default="0", type=str, help='wanted sdk version, leave empty for no patching')# 05.050.001 is the one usually used when converting sdk version
 	parser.add_argument('--add-modded-to-output', required=False, default=False, action='store_true', help='if true then adds _modded to the output file name')
-	parser.add_argument('--patch-memhole', required=False, default="2", type=str, help="0 - don't patch, 1 - patch the memory size, 2 - move the segments")
+	parser.add_argument('--patch-memhole', required=False, default="1", type=str, help="0 - don't patch, 1 - extend the memory size of the segment to fill the memhole, 2 - move the segments after the memhole backwards")
 	parser.add_argument('--patch-memhole-references', required=False, default="001", type=str, help=("use --patch-memhole-references-help in order to see usage"))
 	parser.add_argument('--patch-memhole-references-help', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-program-headers', required=False, default=False, action='store_true')
@@ -486,7 +486,7 @@ else:
 	parser.add_argument('--overwrite', required=False, default=False, action='store_true')
 	parser.add_argument('--sdk-version', required=False, default="0", type=str, help='wanted sdk version, leave empty for no patching')# 05.050.001 is the one usually used when converting sdk version
 	parser.add_argument('--add-modded-to-output', required=False, default=False, action='store_true', help='if true then adds _modded to the output file name')
-	parser.add_argument('--patch-memhole', required=False, default="2", type=str, help="0 - don't patch, 1 - patch the memory size, 2 - move the segments")
+	parser.add_argument('--patch-memhole', required=False, default="1", type=str, help="0 - don't patch, 1 - extend the memory size of the segment to fill the memhole, 2 - move the segments after the memhole backwards")
 	parser.add_argument('--patch-memhole-references', required=False, default="001", type=str, help=("use --patch-memhole-references-help in order to see usage"))
 	parser.add_argument('--patch-memhole-references-help', required=False, default=False, action='store_true')
 	parser.add_argument('--not-patch-program-headers', required=False, default=False, action='store_true')
