@@ -1037,6 +1037,9 @@ with open(output_file_path_fixed, 'r+b') as f:
 
 						segment.mem_size = new_mem_size
 
+						paddr_diff = old_paddr - new_paddr
+						vaddr_diff = old_vaddr - new_vaddr
+
 						if args.patch_memhole == "2":
 							next_segment.paddr = new_paddr
 							next_segment.vaddr = new_vaddr
@@ -1046,12 +1049,12 @@ with open(output_file_path_fixed, 'r+b') as f:
 									if old_paddr == segments[segments_indexB].paddr:
 										method_found = True
 
-										segments[segments_indexB].paddr = next_segment.paddr
+										segments[segments_indexB].paddr = new_paddr
 
 									if old_vaddr == segments[segments_indexB].vaddr:
 										method_found = True
 
-										segments[segments_indexB].vaddr = next_segment.paddr
+										segments[segments_indexB].vaddr = new_vaddr
 
 									if segments[segments_indexB].mem_size > paddr_mem_size:
 										method_found = True
@@ -1066,23 +1069,40 @@ with open(output_file_path_fixed, 'r+b') as f:
 									if segments[segments_indexB].file_size > paddr_file_size:
 										method_found = True
 
-										paddr_file_size = segments[segments_indexB].mem_size
+										paddr_file_size = segments[segments_indexB].file_size
 
 									if segments[segments_indexB].file_size > vaddr_file_size:
 										method_found = True
 
-										vaddr_file_size = segments[segments_indexB].mem_size
+										vaddr_file_size = segments[segments_indexB].file_size
 
 									if method_found is True:
 										method_found = False
 									else:
 										break
+									
+							paddr_end = paddr_start + paddr_mem_size - 1
+							vaddr_end = vaddr_start + vaddr_mem_size - 1
 
-						paddr_end = paddr_start + paddr_mem_size - 1
-						vaddr_end = vaddr_start + vaddr_mem_size - 1
+							for phdrs_index, phdr in enumerate(elf.phdrs):
+								if (
+									phdr.paddr > old_paddr
+									or phdr.vaddr > old_vaddr
+								):
+									if phdr.paddr > old_paddr:
+										phdr.paddr -= paddr_diff
 
-						paddr_diff = old_paddr - new_paddr
-						vaddr_diff = old_vaddr - new_vaddr
+									if phdr.vaddr > old_vaddr:
+										phdr.vaddr -= vaddr_diff
+
+									if phdr.paddr + phdr.mem_size - 1 > paddr_end:
+										paddr_end = phdr.paddr + phdr.mem_size - 1
+
+									if phdr.vaddr + phdr.mem_size - 1 > vaddr_end:
+										vaddr_end = phdr.vaddr + phdr.mem_size - 1
+						else:
+							paddr_end = paddr_start + paddr_mem_size - 1
+							vaddr_end = vaddr_start + vaddr_mem_size - 1
 								
 						if args.verbose is True:
 							Headers = []
